@@ -53,7 +53,8 @@ int main()
     
     F f;
     init(f);
-    if(!DPLL(f)) printf("-1\n");
+    DPLL(f);
+    if(!flag) printf("s -1\n");
     else
     {
         auto end_time = std::chrono::high_resolution_clock::now();
@@ -168,21 +169,39 @@ void UP(F &f)
             if(!f.clause_tf[i])
             {
                 int cnt;
-                //cnt是返回的子句中的literal的下标
-                if((cnt = FindSignalLiteral(f, signal_clause, i)) != -1)
+                //cnt是返回的子句中的literal的下标，找到句子中包含的所有单文字并赋值
+                for(size_t j=0; j<f.clauses[i].size(); j++)
                 {
-                    if(f.clauses[i][cnt] < 0)
+                    if(abs(f.clauses[i][j]) == abs(signal_clause))
                     {
-                        f.clauses_sta[i][cnt] = signal_clause < 0 ? 1 : 0;
-                        f.clause_tf[i] = signal_clause < 0 ? true : false;
-                        f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
-                    }
-                    else{
-                        f.clauses_sta[i][cnt] = signal_clause > 0 ? 1 : 0;
-                        f.clause_tf[i] = signal_clause > 0 ? true : false;
-                        f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
+                        if(f.clauses[i][j] < 0)
+                        {
+                            f.clauses_sta[i][j] = signal_clause < 0 ? 1 : 0;
+                            f.clause_tf[i] = signal_clause < 0 ? true : false;
+                            f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
+                        }
+                        else{
+                            f.clauses_sta[i][j] = signal_clause > 0 ? 1 : 0;
+                            f.clause_tf[i] = signal_clause > 0 ? true : false;
+                            f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
+                        }
                     }
                 }
+
+                // if((cnt = FindSignalLiteral(f, signal_clause, i)) != -1)
+                // {
+                //     if(f.clauses[i][cnt] < 0)
+                //     {
+                //         f.clauses_sta[i][cnt] = signal_clause < 0 ? 1 : 0;
+                //         f.clause_tf[i] = signal_clause < 0 ? true : false;
+                //         f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
+                //     }
+                //     else{
+                //         f.clauses_sta[i][cnt] = signal_clause > 0 ? 1 : 0;
+                //         f.clause_tf[i] = signal_clause > 0 ? true : false;
+                //         f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
+                //     }
+                // }
             }
         }
     }
@@ -218,7 +237,8 @@ bool DPLL(F &f)
 
     UP(f);
 
-    if(CheckSatisfy(f)) return true;
+    if(CheckSatisfy(f)) 
+        return true;
     if(CheckNonClauses(f)) 
         return false;
 
@@ -234,10 +254,9 @@ bool DPLL(F &f)
     f.clause_tf.push_back(false);
     f.clauses_literal_cnt.push_back(1);
 
-
-    if(DPLL(f))
+    bool test = DPLL(f);
+    if(test)
     {
-        if(!flag) printf("Satisfied\n");
         flag = true;
         return true;
     }
@@ -252,7 +271,9 @@ bool DPLL(F &f)
         f.clause_tf.push_back(false);
         f.clauses_literal_cnt.push_back(1);
 
-        DPLL(f);
+        test = DPLL(f);
+        if(test) return true;
+        else return false;
     }
 }
 

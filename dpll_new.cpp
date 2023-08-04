@@ -34,7 +34,7 @@ class F
     }
 };
 
-string file = "test";
+string file = "t3";
 int all_literals, all_clauses;
 
 void init(F &f);
