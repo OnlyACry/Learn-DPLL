@@ -34,7 +34,7 @@ class F
     }
 };
 
-string file = "unsat-5cnf-30";
+string file = "ec-mod2c-rand3bip-sat-250-2.shuffled-as.sat05-2534";
 bool flag = false;
 int all_literals, all_clauses;
 
@@ -46,6 +46,7 @@ int FindSignalLiteral(F f, int signal_clause, int index_of_clause);
 void UP(F &f); 
 bool DPLL(F &f);
 void Print(F f, bool satisfy, int64_t t);
+void Check(F f);
 
 int main()
 {
@@ -53,7 +54,10 @@ int main()
     
     F f;
     init(f);
+    //测试读取过程
+    // Check(f);
     DPLL(f);
+    Check(f);
     if(!flag) printf("s -1\n");
     else
     {
@@ -66,7 +70,7 @@ int main()
 
 void init(F &f)
 {
-    string s = "test/" + file + ".cnf";
+    string s = "test/M/" + file + ".cnf";
     ifstream file(s);
     if(!file){
         cout<<"Failed to open the file"<<endl;
@@ -111,6 +115,15 @@ void init(F &f)
             j++;
         }
     }
+
+    // i = 0;
+    // string satinput = "-1 2 -3 4 -5 -6 7 8 -9 10 11 -12 -13 -14 15 -16 -17 18 -19 20 -21 -22 -23 24 -25 -26 27 -28 -29 -30 -31 32 -33 -34 35 36 -37 -38 -39 -40 41 42 43 44 45 -46 -47 -48 49 -50 -51 52 -53 54 55 -56 57 58 59 60 61 -62 63 -64 -65 66 -67 -68 -69 -70 71 72 73 74 75 76 -77 78 -79 -80 -81 -82 -83 -84 85 86 -87 -88 -89 -90 91 92 -93 -94 -95 -96 97 -98 99 -100";
+    // istringstream is(satinput);
+    // while(is >> literal)
+    // {
+    //     if(literal < 0) f.literals_pos[i++] = 0;
+    //     else f.literals_pos[i++] = 1;
+    // }
 }
 
 int FindSignalLiteral(F f, int signal_clause, int index_of_clause)
@@ -157,7 +170,6 @@ void UP(F &f)
 
         //单子句赋值为真、此文字的计数更新为零
         //进行传播
-        //正负极性弄得太麻烦了，如何化简->直接不设置正负极性?
         f.clause_tf[num1] = true;
         f.literals_cnt[abs(signal_clause) - 1] = 0;
         f.literals_pos[abs(signal_clause) - 1] = signal_clause < 0 ? 0 : 1;
@@ -187,21 +199,6 @@ void UP(F &f)
                         }
                     }
                 }
-
-                // if((cnt = FindSignalLiteral(f, signal_clause, i)) != -1)
-                // {
-                //     if(f.clauses[i][cnt] < 0)
-                //     {
-                //         f.clauses_sta[i][cnt] = signal_clause < 0 ? 1 : 0;
-                //         f.clause_tf[i] = signal_clause < 0 ? true : false;
-                //         f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
-                //     }
-                //     else{
-                //         f.clauses_sta[i][cnt] = signal_clause > 0 ? 1 : 0;
-                //         f.clause_tf[i] = signal_clause > 0 ? true : false;
-                //         f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
-                //     }
-                // }
             }
         }
     }
@@ -234,13 +231,18 @@ bool DPLL(F &f)
     // if(CheckSatisfy(f)) return true;    //?????
     // if(CheckNonClauses(f)) return false;
 
-
     UP(f);
 
-    if(CheckSatisfy(f)) 
+    if(CheckSatisfy(f))
+    {
+        flag = true;
         return true;
+    }
     if(CheckNonClauses(f)) 
+    {
+        flag = false;
         return false;
+    }
 
     int literal = ChooseLiteral(f);
     vector<int> a;  //单子句赋值
@@ -272,8 +274,16 @@ bool DPLL(F &f)
         f.clauses_literal_cnt.push_back(1);
 
         test = DPLL(f);
-        if(test) return true;
-        else return false;
+        if(test)
+        {
+            flag = true;
+            return true;
+        }
+        else
+        {
+            flag = false;
+            return false;
+        }
     }
 }
 
@@ -292,7 +302,7 @@ void Print(F f, bool satisfy, int64_t t)
     }
     else printf("s -1\n");
 
-    string s = "res/" + file + ".res";
+    string s = "res/M/" + file + ".res";
     ofstream outfile(s);
 
     if (satisfy)
@@ -332,4 +342,46 @@ void InsertClauses(F &f, int signal_clause)
     f.clause_tf.push_back(false);
 
     f.clauses_literal_cnt.push_back(1);
+}
+
+void Check(F f)
+{
+    F new_f;
+    int choose;
+    bool fl = false;
+    new_f.clauses = f.clauses;
+    new_f.literals_pos = f.literals_pos;
+
+    for(size_t i=0; i<new_f.clauses.size(); i++)
+    {
+        fl = false;
+        for(size_t j=0; j<new_f.clauses[i].size(); j++)
+        {
+            choose = new_f.literals_pos[abs(new_f.clauses[i][j]) - 1];
+            if(choose == -1)
+            {
+                fl=true;
+                break;
+            }
+            else
+            {
+                if(new_f.clauses[i][j] < 0 && choose == 0)
+                {
+                    fl = true;
+                    break;
+                }
+                if(new_f.clauses[i][j] > 0 && choose == 1)
+                {
+                    fl = true;
+                    break;
+                }
+            }
+        }
+        if(fl)
+        {
+            printf("\nyes\n");
+            return;
+        }
+    }
+    printf("\nno\n");
 }
