@@ -13,13 +13,13 @@ using namespace std;
 class F
 {
     public:
-    vector<int> literals_pos;   //文字 0-false 1-true -1-undesign -2-未出现
+    vector<int> literals_pos;   //文字 0-false 1-true -1-undesign
     vector<int> literals_cnt;   //文字出现次数
     vector<int> clauses_literal_cnt;    //子句长度
     vector<bool> clause_tf;     //子句是否满足
     vector<vector<int>> clauses;    //子句
-    // vector<vector<int>> literal_clause;     //文字所在子句
     vector<vector<int>> clauses_sta;    //子句赋值情况->可以优化？
+    // vector<vector<int>> literal_clause;     //文字所在子句
 
     F(){}
 
@@ -34,7 +34,7 @@ class F
     }
 };
 
-string file = "ec-mod2c-rand3bip-sat-250-2.shuffled-as.sat05-2534";
+string file = "unsat-5cnf-30";
 bool flag = false;
 int all_literals, all_clauses;
 
@@ -57,8 +57,15 @@ int main()
     //测试读取过程
     // Check(f);
     DPLL(f);
-    Check(f);
-    if(!flag) printf("s -1\n");
+    //Check(f);
+    if(!flag)
+    {
+        printf("s -1");
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        printf("\nt %ld\n", duration);
+    }
+
     else
     {
         auto end_time = std::chrono::high_resolution_clock::now();
@@ -70,7 +77,7 @@ int main()
 
 void init(F &f)
 {
-    string s = "test/M/" + file + ".cnf";
+    string s = "test/" + file + ".cnf";
     ifstream file(s);
     if(!file){
         cout<<"Failed to open the file"<<endl;
