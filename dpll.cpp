@@ -34,7 +34,7 @@ class F
     }
 };
 
-string file = "unsat-5cnf-30";
+string file = "t3";
 bool flag = false;
 int all_literals, all_clauses;
 

@@ -43,7 +43,7 @@ int ChooseLiteral(F f);
 int ChooseLiteral2(F f);
 int FindSignalLiteral(F f, int signal_clause, int index_of_clause);
 int UP(F &f); 
-void Find_UP(F f, int signal_clause, int &num1, int &num2);
+void Find_UP(F f, int& signal_clause, int &num1, int &num2);
 void Print(F f, bool satisfy, int64_t t);
 void InsertClauses(F &f, int signal_clause);    //插入单子句
 void Simplify_clauses(F &f, int signal_clause);
@@ -168,36 +168,39 @@ int ChooseLiteral(F f)
 //返回句子最短的未赋值文字
 int ChooseLiteral2(F f)
 {
+
     return 0;
 }
 
-///单子句传播
-// int UP(F &f)
-// {
-//     int signal_clause, num1, num2;
-//     //找到单子句并进行单子句传播
-//     while ((signal_clause = count(f.clauses_literal_cnt.begin(), f.clauses_literal_cnt.end(), 1)) != 0)
-//     {
-//         Find_UP(f, signal_clause, num1, num2);    //找到单子句的位置
-
-//         //单子句赋值为真、此文字的计数更新为零
-//         //进行传播
-//         f.clause_tf[num1] = true;
-//         f.literals_cnt[abs(signal_clause) - 1] = 0;
-//         f.literals_pos[abs(signal_clause) - 1] = signal_clause < 0 ? 0 : 1;
-//         f.clauses_sta[num1][num2] = 1;  //单子句为真
-        
-//         Simplify_clauses(f, signal_clause);    //对单子句进行更新
-
-//         if(CheckSatisfy(f)) return 1;   //满足返回1
-//         else if(CheckNonClauses(f)) return 0;   //发生冲突返回0
-//     }
-//     return -1;  //传播完成
-// }
-
-void Find_UP(F f, int& signal_clause, int &num1, int &num2)
+//单子句传播
+int UP(F &f)
 {
-    //选择到单子句
+    int signal_clause, num1, num2;
+    //检查是否有空子句
+    if(CheckNonClauses(f)) return 0;
+    //找到单子句并进行单子句传播
+    while ((signal_clause = count(f.clauses_literal_cnt.begin(), f.clauses_literal_cnt.end(), 1)) != 0)
+    {
+        Find_UP(f, signal_clause, num1, num2);    //找到单子句的位置
+
+        //单子句赋值为真、此文字的计数更新为零
+        //进行传播
+        f.clause_tf[num1] = true;
+        f.literals_cnt[abs(signal_clause) - 1] = 0;
+        f.literals_pos[abs(signal_clause) - 1] = signal_clause < 0 ? 0 : 1;
+        f.clauses_sta[num1][num2] = 1;  //单子句为真
+        f.clauses_literal_cnt[num1] = 0;
+
+        Simplify_clauses(f, signal_clause);    //对单子句进行更新
+    }
+    if(CheckSatisfy(f)) return 1;   //满足返回1
+    else if(CheckNonClauses(f)) return 0;   //发生冲突返回0
+    else return -1;
+}
+
+void Find_UP(F f, int &signal_clause, int &num1, int &num2)
+{
+    //找到单子句
     for(size_t i=0; i<f.clauses_literal_cnt.size(); i++)
     {
         if(f.clauses_literal_cnt[i] == 1){ num1 = i; f.clauses_literal_cnt[i] = 0; break; }
@@ -208,74 +211,9 @@ void Find_UP(F f, int& signal_clause, int &num1, int &num2)
         {
             num2 = i;
             signal_clause = f.clauses[num1][i];
-            f.clauses_literal_cnt[num1] = 0;
             break;
         }
     }
-}
-
-int UP(F &f)
-{
-    int signal_clause, num1, num2;
-    //检查是否有空子句
-    if(CheckNonClauses(f)) return 0;
-    //找到单子句并进行单子句传播
-    //优化：用数组记录每个子句的长度
-    while ((signal_clause = count(f.clauses_literal_cnt.begin(), f.clauses_literal_cnt.end(), 1)) != 0)
-    {
-        //找到单子句
-        for(size_t i=0; i<f.clauses_literal_cnt.size(); i++)
-        {
-            if(f.clauses_literal_cnt[i] == 1){ num1 = i; f.clauses_literal_cnt[i] = 0; break; }
-        }
-        for(size_t i=0; i < f.clauses_sta[num1].size(); i++)
-        {
-            if(f.clauses_sta[num1][i] == -1)
-            {
-                num2 = i;
-                signal_clause = f.clauses[num1][i];
-                f.clauses_literal_cnt[num1] = 0;
-                break;
-            }
-        }
-
-        //单子句赋值为真、此文字的计数更新为零
-        //进行传播
-        f.clause_tf[num1] = true;
-        f.literals_cnt[abs(signal_clause) - 1] = 0;
-        f.literals_pos[abs(signal_clause) - 1] = signal_clause < 0 ? 0 : 1;
-        f.clauses_sta[num1][num2] = 1;  //单子句为真
-        
-        //找不为true且包含单子句的子句
-        for(size_t i=0; i < f.clause_tf.size(); i++)
-        {
-            if(!f.clause_tf[i])
-            {
-                int cnt;
-                //cnt是返回的子句中的literal的下标，找到句子中包含的所有单文字并赋值
-                for(size_t j=0; j<f.clauses[i].size(); j++)
-                {
-                    if(abs(f.clauses[i][j]) == abs(signal_clause))
-                    {
-                        if(f.clauses[i][j] < 0)
-                        {
-                            f.clauses_sta[i][j] = signal_clause < 0 ? 1 : 0;
-                            f.clause_tf[i] = signal_clause < 0 ? true : false;
-                            f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
-                        }
-                        else{
-                            f.clauses_sta[i][j] = signal_clause > 0 ? 1 : 0;
-                            f.clause_tf[i] = signal_clause > 0 ? true : false;
-                            f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
-                        }
-                    }
-                }
-            }
-        }
-    }
-    if(CheckSatisfy(f)) return 1;   //满足返回1
-    else if(CheckNonClauses(f)) return 0;   //发生冲突返回0
-    else return -1;
 }
 
 void Simplify_clauses(F &f, int signal_clause)
