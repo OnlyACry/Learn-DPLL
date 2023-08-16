@@ -18,7 +18,7 @@ class F
     vector<int> clauses_literal_cnt;    //子句长度
     vector<bool> clause_tf;     //子句是否满足
     vector<vector<int>> clauses;    //子句
-    vector<vector<int>> clauses_sta;    //子句赋值情况->可以优化？
+    // vector<vector<int>> clauses_sta;    //子句赋值情况->可以优化？
     // vector<vector<int>> literal_clause;     //文字所在子句
 
     F(){}
@@ -28,7 +28,7 @@ class F
         literals_pos = f.literals_pos;
         clauses = f.clauses;
         literals_cnt = f.literals_cnt;
-        clauses_sta = f.clauses_sta;
+        // clauses_sta = f.clauses_sta;
         clauses_literal_cnt = f.clauses_literal_cnt;
         clause_tf = f.clause_tf;
     }
@@ -103,8 +103,8 @@ void init(F &f)
             f.literals_cnt.resize(all_literals);
             f.clauses.clear();
             f.clauses.resize(all_clauses);
-            f.clauses_sta.clear();
-            f.clauses_sta.resize(all_clauses);      // <- 对应clauses中文字的赋值
+            // f.clauses_sta.clear();
+            // f.clauses_sta.resize(all_clauses);      // <- 对应clauses中文字的赋值
             f.clauses_literal_cnt.clear();
             f.clauses_literal_cnt.resize(all_clauses, 0);
             f.clause_tf.clear();
@@ -115,13 +115,11 @@ void init(F &f)
         while(iss >> literal)
         {
             if(literal == 0) {
-                f.clauses_literal_cnt[i] = j;   //子句中文字数量
-                f.clauses_sta[i++].resize(j, -1);   //把每个子句中文字的赋值初始化
+                f.clauses_literal_cnt[i++] = j;   //子句中文字数量
                 j = 0;
                 continue;
             }
-            if(literal > 0) f.literals_cnt[literal-1]++;
-            else if(literal < 0) f.literals_cnt[abs(literal) - 1]++;
+            f.literals_cnt[abs(literal) - 1]++;
             f.clauses[i].push_back(literal);
             j++;
         }
@@ -195,7 +193,7 @@ void UP(F &f)
         f.clause_tf[num1] = true;
         f.literals_cnt[abs(signal_clause) - 1] = 0;
         f.literals_pos[abs(signal_clause) - 1] = signal_clause < 0 ? 0 : 1;
-        f.clauses_sta[num1][num2] = 1;  //单子句为真
+        // f.clauses_sta[num1][num2] = 1;  //单子句为真
         f.clauses_literal_cnt[num1] = 0;
 
         Simplify_clauses(f, signal_clause);    //对单子句进行更新
@@ -204,14 +202,16 @@ void UP(F &f)
 
 void Find_UP(F f, int &signal_clause, int &num1, int &num2)
 {
+    int num;
     //找到单子句
     for(size_t i=0; i<f.clauses_literal_cnt.size(); i++)
     {
         if(f.clauses_literal_cnt[i] == 1){ num1 = i; f.clauses_literal_cnt[i] = 0; break; }
     }
-    for(size_t i=0; i < f.clauses_sta[num1].size(); i++)
+    for(size_t i=0; i < f.clauses[num1].size(); i++)
     {
-        if(f.clauses_sta[num1][i] == -1)
+        num = f.clauses[num1][i];
+        if(f.literals_pos[abs(num) - 1] == -1)
         {
             num2 = i;
             signal_clause = f.clauses[num1][i];
@@ -235,12 +235,12 @@ void Simplify_clauses(F &f, int signal_clause)
                 {
                     if(f.clauses[i][j] < 0)
                     {
-                        f.clauses_sta[i][j] = signal_clause < 0 ? 1 : 0;
+                        // f.clauses_sta[i][j] = signal_clause < 0 ? 1 : 0;
                         f.clause_tf[i] = signal_clause < 0 ? true : false;
                         f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
                     }
                     else{
-                        f.clauses_sta[i][j] = signal_clause > 0 ? 1 : 0;
+                        // f.clauses_sta[i][j] = signal_clause > 0 ? 1 : 0;
                         f.clause_tf[i] = signal_clause > 0 ? true : false;
                         f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
                     }
@@ -259,7 +259,7 @@ void InsertClauses(F &f, int signal_clause)
     f.clauses.push_back(new_literal);
 
     a.push_back(-1);
-    f.clauses_sta.push_back(a);
+    // f.clauses_sta.push_back(a);
 
     f.clause_tf.push_back(false);
 
