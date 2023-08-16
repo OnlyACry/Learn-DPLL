@@ -33,7 +33,7 @@ class F
     }
 };
 
-string file = "unsat-5cnf-30";
+string file = "ais10";
 int all_literals, all_clauses;
 
 void init(F &f);
@@ -66,7 +66,7 @@ int main()
         while((i = UP(f)) == -1)
         {
             //选取变元加入f
-            flip_v.push(ChooseLiteral(f));
+            flip_v.push(ChooseLiteral2(f));
             InsertClauses(f, flip_v.top());
 
             S.push(f);
@@ -103,7 +103,7 @@ int main()
 
 void init(F &f)
 {
-    string s = "test/" + file + ".cnf";
+    string s = "test/cs/" + file + ".cnf";
     ifstream file(s);
     if(!file){
         cout<<"Failed to open the file"<<endl;
@@ -168,8 +168,29 @@ int ChooseLiteral(F f)
 //返回句子最短的未赋值文字
 int ChooseLiteral2(F f)
 {
-
-    return 0;
+    //返回最短子句中出现次数最多的文字
+    //find shorest clause
+    int min = INT16_MAX, index, num;
+    for(int i=0; i<f.clauses.size(); i++)
+    {
+        if(f.clause_tf[i] == true || f.clauses_literal_cnt[i] == 0) continue;
+        if(f.clauses_literal_cnt[i] < min)
+        {
+            min = f.clauses_literal_cnt[i];
+            index = i;
+        }
+    }
+    int max = INT16_MIN, n = -1;
+    for(int j=0; j<f.clauses[index].size(); j++)
+    {
+        n = f.clauses[index][j];
+        if(f.literals_pos[abs(n) - 1] == -1 && f.literals_cnt[abs(n) - 1] > max)
+        {
+            num = n;
+            max = f.literals_cnt[abs(n) - 1];
+        }
+    }
+    return num;
 }
 
 //单子句传播
@@ -221,7 +242,7 @@ void Simplify_clauses(F &f, int signal_clause)
     //找不为true且包含单子句的子句
     for(size_t i=0; i < f.clause_tf.size(); i++)
     {
-        if(!f.clause_tf[i])
+        if(!f.clause_tf[i] && f.clauses_literal_cnt[i] > 0)
         {
             int cnt;
             //cnt是返回的子句中的literal的下标，找到句子中包含的所有单文字并赋值
