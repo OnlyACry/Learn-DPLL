@@ -9,32 +9,32 @@
 
 using namespace std;
 
+struct Clause
+{
+    int length = 0;
+    bool clause_tf = false;
+    vector<int> clause;
+}Clause;
+
 //输入算例
 class F
 {
     public:
     vector<int> literals_pos;   //文字 0-false 1-true -1-undesign
     vector<int> literals_cnt;   //文字出现次数
-    vector<int> clauses_literal_cnt;    //子句长度
-    vector<bool> clause_tf;     //子句是否满足
-    vector<vector<int>> clauses;    //子句
-    // vector<vector<int>> clauses_sta;    //子句赋值情况->可以优化？
-    // vector<vector<int>> literal_clause;     //文字所在子句
+    vector<struct Clause> clauses;     //子句
 
     F(){}
 
     F(const F &f)
     {
         literals_pos = f.literals_pos;
-        clauses = f.clauses;
         literals_cnt = f.literals_cnt;
-        // clauses_sta = f.clauses_sta;
-        clauses_literal_cnt = f.clauses_literal_cnt;
-        clause_tf = f.clause_tf;
+        clauses = f.clauses;
     }
 };
 
-string file = "ais10";
+string file = "sud00861";
 bool flag = false;
 int all_literals, all_clauses;
 
@@ -58,8 +58,6 @@ int main()
     
     F f;
     init(f);
-    //测试读取过程
-    // Check(f);
     DPLL(f);
     // Check(f);
     if(!flag)
@@ -69,7 +67,6 @@ int main()
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         printf("\nt %ld\n", duration);
     }
-
     else
     {
         auto end_time = std::chrono::high_resolution_clock::now();
@@ -81,7 +78,7 @@ int main()
 
 void init(F &f)
 {
-    string s = "test/cs/" + file + ".cnf";
+    string s = "test/M/" + file + ".cnf";
     ifstream file(s);
     if(!file){
         cout<<"Failed to open the file"<<endl;
@@ -103,24 +100,18 @@ void init(F &f)
             f.literals_cnt.resize(all_literals);
             f.clauses.clear();
             f.clauses.resize(all_clauses);
-            // f.clauses_sta.clear();
-            // f.clauses_sta.resize(all_clauses);      // <- 对应clauses中文字的赋值
-            f.clauses_literal_cnt.clear();
-            f.clauses_literal_cnt.resize(all_clauses, 0);
-            f.clause_tf.clear();
-            f.clause_tf.resize(all_clauses, false);
             continue;
         }
 
         while(iss >> literal)
         {
             if(literal == 0) {
-                f.clauses_literal_cnt[i++] = j;   //子句中文字数量
+                f.clauses[i++].length = j;
                 j = 0;
                 continue;
             }
             f.literals_cnt[abs(literal) - 1]++;
-            f.clauses[i].push_back(literal);
+            f.clauses[i].clause.push_back(literal);
             j++;
         }
     }
@@ -137,9 +128,9 @@ void init(F &f)
 
 int FindSignalLiteral(F f, int signal_clause, int index_of_clause)
 {
-    for(size_t i=0; i<f.clauses[index_of_clause].size(); i++)
+    for(size_t i=0; i<f.clauses[index_of_clause].clause.size(); i++)
     {
-        if(abs(f.clauses[index_of_clause][i]) == abs(signal_clause)) return i;
+        if(abs(f.clauses[index_of_clause].clause[i]) == abs(signal_clause)) return i;
     }
     return -1;
 }
@@ -157,17 +148,17 @@ int ChooseLiteral2(F f)
     int min = INT16_MAX, index, num;
     for(int i=0; i<f.clauses.size(); i++)
     {
-        if(f.clause_tf[i] == true || f.clauses_literal_cnt[i] == 0) continue;
-        if(f.clauses_literal_cnt[i] < min)
+        if(f.clauses[i].clause_tf == true || f.clauses[i].length == 0) continue;
+        if(f.clauses[i].length < min)
         {
-            min = f.clauses_literal_cnt[i];
+            min = f.clauses[i].length;
             index = i;
         }
     }
     int max = INT16_MIN, n = -1;
-    for(int j=0; j<f.clauses[index].size(); j++)
+    for(int j=0; j<f.clauses[index].clause.size(); j++)
     {
-        n = f.clauses[index][j];
+        n = f.clauses[index].clause[j];
         if(f.literals_pos[abs(n) - 1] == -1 && f.literals_cnt[abs(n) - 1] > max)
         {
             num = n;
@@ -184,7 +175,10 @@ void UP(F &f)
     //检查是否有空子句
     if(CheckNonClauses(f)) return ;
     //找到单子句并进行单子句传播
-    while ((signal_clause = count(f.clauses_literal_cnt.begin(), f.clauses_literal_cnt.end(), 1)) != 0)
+
+    while(auto it = find_if(f.clauses.begin(), f.clauses.end(), [](const struct Clause& c) {
+        return c.length == 1;
+    }))
     {
         Find_UP(f, signal_clause, num1, num2);    //找到单子句的位置
 
@@ -193,7 +187,6 @@ void UP(F &f)
         f.clause_tf[num1] = true;
         f.literals_cnt[abs(signal_clause) - 1] = 0;
         f.literals_pos[abs(signal_clause) - 1] = signal_clause < 0 ? 0 : 1;
-        // f.clauses_sta[num1][num2] = 1;  //单子句为真
         f.clauses_literal_cnt[num1] = 0;
 
         Simplify_clauses(f, signal_clause);    //对单子句进行更新
@@ -235,12 +228,10 @@ void Simplify_clauses(F &f, int signal_clause)
                 {
                     if(f.clauses[i][j] < 0)
                     {
-                        // f.clauses_sta[i][j] = signal_clause < 0 ? 1 : 0;
                         f.clause_tf[i] = signal_clause < 0 ? true : false;
                         f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
                     }
                     else{
-                        // f.clauses_sta[i][j] = signal_clause > 0 ? 1 : 0;
                         f.clause_tf[i] = signal_clause > 0 ? true : false;
                         f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
                     }
@@ -259,7 +250,6 @@ void InsertClauses(F &f, int signal_clause)
     f.clauses.push_back(new_literal);
 
     a.push_back(-1);
-    // f.clauses_sta.push_back(a);
 
     f.clause_tf.push_back(false);
 
@@ -289,10 +279,6 @@ bool CheckSatisfy(F f)
 
 bool DPLL(F &f)
 {
-    //函数出口怎么找
-    // if(CheckSatisfy(f)) return true;    //?????
-    // if(CheckNonClauses(f)) return false;
-
     UP(f);
 
     if(CheckSatisfy(f))
@@ -353,7 +339,7 @@ void Print(F f, bool satisfy, int64_t t)
     }
     else printf("s -1\n");
 
-    string s = "res/cs/" + file + ".res";
+    string s = "res/M/" + file + ".res";
     ofstream outfile(s);
 
     if (satisfy)
