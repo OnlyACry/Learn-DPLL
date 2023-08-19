@@ -31,7 +31,7 @@ class F
     }
 };
 
-string file = "problem12-200";
+string file = "m-SGI_30_80_15_90_4-dir.shuffled-as.sat03-6-450";
 bool flag = false;
 int all_literals, all_clauses;
 
@@ -182,8 +182,6 @@ int ChooseLiteral2(F f)
 void UP(F &f)
 {
     int signal_clause, num1, num2;
-    //检查是否有空子句
-    if(CheckNonClauses(f)) return ;
     //找到单子句并进行单子句传播
     while ((signal_clause = count(f.clauses_literal_cnt.begin(), f.clauses_literal_cnt.end(), 1)) != 0)
     {
@@ -209,7 +207,7 @@ void Find_UP(F f, int &signal_clause, int &num1, int &num2)
     {
         if(f.clauses_literal_cnt[i] == 1)
         { 
-            num1 = i; f.clauses_literal_cnt[i] = 0; break; 
+            num1 = i; break; 
         }
     }
     for(size_t i=0; i < f.clauses[num1].size(); i++)
@@ -226,25 +224,24 @@ void Find_UP(F f, int &signal_clause, int &num1, int &num2)
 
 void Simplify_clauses(F &f, int signal_clause)
 {
+    int num;
     //找不为true且包含单子句的子句
     for(size_t i=0; i < f.clause_tf.size(); i++)
     {
         if(!f.clause_tf[i] && f.clauses_literal_cnt[i] > 0)
         {
-            int cnt;
-            //cnt是返回的子句中的literal的下标，找到句子中包含的所有单文字并赋值
             for(size_t j=0; j<f.clauses[i].size(); j++)
             {
-                if(abs(f.clauses[i][j]) == abs(signal_clause))
+                if(f.clause_tf[i]) break;   //满足时退出
+                num = abs(f.clauses[i][j]);
+                if(num == abs(signal_clause))
                 {
                     if(f.clauses[i][j] < 0)
                     {
-                        // f.clauses_sta[i][j] = signal_clause < 0 ? 1 : 0;
                         f.clause_tf[i] = signal_clause < 0 ? true : false;
                         f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
                     }
                     else{
-                        // f.clauses_sta[i][j] = signal_clause > 0 ? 1 : 0;
                         f.clause_tf[i] = signal_clause > 0 ? true : false;
                         f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
                     }
@@ -293,10 +290,6 @@ bool CheckSatisfy(F f)
 
 bool DPLL(F &f)
 {
-    //函数出口怎么找
-    // if(CheckSatisfy(f)) return true;    //?????
-    // if(CheckNonClauses(f)) return false;
-
     UP(f);
 
     if(CheckSatisfy(f))
@@ -312,11 +305,6 @@ bool DPLL(F &f)
 
     // int literal = ChooseLiteral(f);
     int literal = ChooseLiteral2(f);
-    // if(literal == -1)
-    // {
-    //     //说明没有找到单子句?????
-    // }
-
 
     F f_clone = f;
 
