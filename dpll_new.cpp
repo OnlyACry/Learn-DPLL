@@ -6,8 +6,31 @@
 #include <stack>
 #include <chrono>
 #include <algorithm>
+#include <set>
+#include <map>
 
 using namespace std;
+
+struct Save_C
+{
+    bool tf;        //句子满足性
+    int length;     //句子长度改变
+}Save_C;
+
+class S_C
+{
+    public:   
+    vector<int> v;      //记录改变的文字，其赋值为此文字原本在整个算例中出现的次数
+    map<int, struct Save_C> all_change_c;   //记录修改之前的句子
+
+    S_C(){}
+
+    S_C(const S_C &sc)
+    {
+        v = sc.v;
+        all_change_c = sc.all_change_c;
+    }
+}
 
 //输入算例
 class F
@@ -39,63 +62,64 @@ bool CheckNonClauses(F f);
 bool CheckSatisfy(F f);
 int ChooseLiteral(F f);
 int ChooseLiteral2(F f);
-int FindSignalLiteral(F f, int signal_clause, int index_of_clause);
-int UP(F &f); 
+bool UP(F &f, S_C &sc); 
 void Find_UP(F f, int& signal_clause, int &num1, int &num2);
 void Print(F f, bool satisfy, int64_t t);
 void InsertClauses(F &f, int signal_clause);    //插入单子句
-void Simplify_clauses(F &f, int signal_clause);
+void Simplify_clauses(F &f, int signal_clause, S_C &sc);
+void BackToPrevious(F &f, S_C sc);
+void Updatef_sc(F &f, S_C &sc, int i, int signal_clause);
 
 int main()
 {
     auto start_time = std::chrono::high_resolution_clock::now();
+
+    S_C sc;
+    stack<S_C>  save_stack;
+    stack<int> flip_v;
     
     bool flag = false;
-    F f, f_clone;
-    stack<F> S;
-    stack<int> flip_v;
-    int signal_clause, literal, i;
+    int i = 0, signal_clause;
+
     init(f);
+    do{
+        if(UP(f, sc))
+        {
+            signal_clause = ChooseLiteral2(f);
+            if(signal_clause == -1) {flag = true; break;}
 
-    S.push(f);
-    while(!S.empty())
-    {
-        f = S.top();
-        while((i = UP(f)) == -1)
-        {
-            //选取变元加入f
-            flip_v.push(ChooseLiteral2(f));
-            InsertClauses(f, flip_v.top());
-
-            S.push(f);
+            save_stack.push(sc);
+            flip_v.push(signal_clause);
         }
-        if(i == 1)  //满足
+        else
         {
-            flag = true;
-            S.pop();
-            auto end_time = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-            Print(f, true, duration);
-            break;
-        }
-        if(i == 0)
-        {
-            S.pop();
-            if(S.empty()) break;    //
-            f = S.top();
-            S.pop();
-            InsertClauses(f, -(flip_v.top()));
+            //返回到上一步
+            if(save_stack.empty()) break;
+            
+            sc = save_stack.top();
+            save_stack.pop();
+            BackToPrevious(f, sc);
+            //翻转变元
+            signal_clause = flip_v.top();
+            InsertClauses(f, -signal_clause);
             flip_v.pop();
-            S.push(f);
         }
-    }
-    if(!flag)
+    }while(!save_stack.empty())
+
+    if(flag)
     {
-        printf("s -1");
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        Print(f, true, duration);
+    }
+    else
+    {
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        printf("s -1");
         printf("\nt %ld\n", duration);
     }
+
     return 0;
 }
 
@@ -145,13 +169,10 @@ void init(F &f)
     }
 }
 
-int FindSignalLiteral(F f, int signal_clause, int index_of_clause)
+void initsc(S_C &sc)
 {
-    for(size_t i=0; i<f.clauses[index_of_clause].size(); i++)
-    {
-        if(abs(f.clauses[index_of_clause][i]) == abs(signal_clause)) return i;
-    }
-    return -1;
+    sc.v.resize(all_literals, -1);
+    sc.all_change_c.resize(all_clauses);
 }
 
 //返回最多次文字出现的下标
@@ -188,17 +209,44 @@ int ChooseLiteral2(F f)
     return num;
 }
 
-//单子句传播
-int UP(F &f)
+void Updatef_sc(F &f, S_C &sc, int i, int signal_clause)
 {
+    struct Save_C pov_clause;
+    //首先检测是否已有键值
+    if(sc.all_change_c.find(i) != sc.all_change_c.end()) return;    //存在映射中，不更新
+
+    pov_clause.length = f.clauses_literal_cnt[i];
+    pov_clause.tf = f.clause_tf[i];
+    sc.v[abs(signal_clause) - 1] = f.clauses_literal_cnt[abs(signal_clause) - 1];
+    sc.all_change_c[i] = pov_clause;
+}
+
+void BackToPrevious(F &f, S_C sc)
+{
+    int index;
+    struct Save_C back_c;
+    for (map<int, struct Save_C>::iterator it = myMap.begin(); it != myMap.end(); ++it) 
+    {
+        index = it->first;
+        back_c = it->second;
+        f.clause_tf[index] = back_c.tf;
+        f.clauses_literal_cnt[index] = back_c.length;
+    }
+    f.clauses.pop_back();
+    f.clause_tf.pop_back();
+    f.clauses_literal_cnt.pop_back();
+}
+//单子句传播
+bool UP(F &f, S_C &sc)
+{
+    int i
     int signal_clause, num1, num2;
-    //检查是否有空子句
-    if(CheckNonClauses(f)) return 0;
+    
     //找到单子句并进行单子句传播
     while ((signal_clause = count(f.clauses_literal_cnt.begin(), f.clauses_literal_cnt.end(), 1)) != 0)
     {
         Find_UP(f, signal_clause, num1, num2);    //找到单子句的位置
-
+        Updatef_sc(f, sc, num1, signal_clause);   //记录更改掉的子句之前的值
         //单子句赋值为真、此文字的计数更新为零
         //进行传播
         f.clause_tf[num1] = true;
@@ -206,11 +254,11 @@ int UP(F &f)
         f.literals_pos[abs(signal_clause) - 1] = signal_clause < 0 ? 0 : 1;
         f.clauses_literal_cnt[num1] = 0;
 
-        Simplify_clauses(f, signal_clause);    //对单子句进行更新
+        //对单子句进行更新
+        if(!Simplify_clauses(f, signal_clause)) 
+            return false;   //发生冲突
     }
-    if(CheckSatisfy(f)) return 1;   //满足返回1
-    else if(CheckNonClauses(f)) return 0;   //发生冲突返回0
-    else return -1;
+    return 0;
 }
 
 void Find_UP(F f, int &signal_clause, int &num1, int &num2)
@@ -233,7 +281,7 @@ void Find_UP(F f, int &signal_clause, int &num1, int &num2)
     }
 }
 
-void Simplify_clauses(F &f, int signal_clause)
+void Simplify_clauses(F &f, int signal_clause, S_C &sc)
 {
     //找不为true且包含单子句的子句
     for(size_t i=0; i < f.clause_tf.size(); i++)
@@ -241,20 +289,30 @@ void Simplify_clauses(F &f, int signal_clause)
         if(!f.clause_tf[i] && f.clauses_literal_cnt[i] > 0)
         {
             int cnt;
-            //cnt是返回的子句中的literal的下标，找到句子中包含的所有单文字并赋值
-            for(size_t j=0; j<f.clauses[i].size(); j++)
+            int count = count_if(f.clauses[i].begin(), f.clauses[i].end(), [abs(signal_clause)](int x) {
+                return abs(x) == abs(signal_clause);
+            });
+            if(count > 0)
             {
-                if(abs(f.clauses[i][j]) == abs(signal_clause))
+                Updatef_sc(f, sc, num1, signal_clause);   //记录子句之前的值
+                //cnt是返回的子句中的literal的下标，找到句子中包含的所有单文字并赋值
+                for(size_t j=0; j<f.clauses[i].size(); j++)
                 {
-                    if(f.clauses[i][j] < 0)
+                    if(abs(f.clauses[i][j]) == abs(signal_clause))
                     {
-                        f.clause_tf[i] = signal_clause < 0 ? true : false;
-                        f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
+                        if(f.clauses[i][j] < 0)
+                        {
+                            f.clause_tf[i] = signal_clause < 0 ? true : false;
+                            f.clauses_literal_cnt[i] = signal_clause < 0 ? 0 : f.clauses_literal_cnt[i] - 1;
+                        }
+                        else{
+                            f.clause_tf[i] = signal_clause > 0 ? true : false;
+                            f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
+                        }
                     }
-                    else{
-                        f.clause_tf[i] = signal_clause > 0 ? true : false;
-                        f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
-                    }
+                    if(f.clause_tf[i]) break;   //满足时退出
+                    else if(f.clauses_literal_cnt[i] == 0 && f.clause_tf[i] == false)   //出现冲突
+                        return false;
                 }
             }
         }

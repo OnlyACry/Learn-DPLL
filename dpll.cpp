@@ -9,32 +9,29 @@
 
 using namespace std;
 
-struct Clause
-{
-    int length = 0;
-    bool clause_tf = false;
-    vector<int> clause;
-}Clause;
-
 //输入算例
 class F
 {
     public:
     vector<int> literals_pos;   //文字 0-false 1-true -1-undesign
     vector<int> literals_cnt;   //文字出现次数
-    vector<struct Clause> clauses;     //子句
+    vector<int> clauses_literal_cnt;    //子句长度
+    vector<bool> clause_tf;     //子句是否满足
+    vector<vector<int>> clauses;    //子句
 
     F(){}
 
     F(const F &f)
     {
         literals_pos = f.literals_pos;
-        literals_cnt = f.literals_cnt;
         clauses = f.clauses;
+        literals_cnt = f.literals_cnt;
+        clauses_literal_cnt = f.clauses_literal_cnt;
+        clause_tf = f.clause_tf;
     }
 };
 
-string file = "sud00861";
+string file = "m-mod2c-rand3bip-sat-220-3.shuffled-as.sat05-2490-311";
 bool flag = false;
 int all_literals, all_clauses;
 
@@ -44,9 +41,9 @@ bool CheckSatisfy(F f);
 int ChooseLiteral(F f);
 int ChooseLiteral2(F f);
 int FindSignalLiteral(F f, int signal_clause, int index_of_clause);
-void UP(F &f); 
+bool UP(F &f); 
 void Find_UP(F f, int& signal_clause, int &num1, int &num2);
-void Simplify_clauses(F &f, int signal_clause);
+bool Simplify_clauses(F &f, int signal_clause);
 void InsertClauses(F &f, int signal_clause);    //插入单子句
 bool DPLL(F &f);
 void Print(F f, bool satisfy, int64_t t);
@@ -58,21 +55,18 @@ int main()
     
     F f;
     init(f);
-    DPLL(f);
-    // Check(f);
-    if(!flag)
-    {
+    if(DPLL(f)){
+        auto end_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+        Print(f, true, duration);
+    }
+    else{
         printf("s -1");
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         printf("\nt %ld\n", duration);
     }
-    else
-    {
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        Print(f, true, duration);
-    }
+    Check(f);
     return 0;
 }
 
@@ -99,19 +93,23 @@ void init(F &f)
             f.literals_cnt.clear();
             f.literals_cnt.resize(all_literals);
             f.clauses.clear();
-            f.clauses.resize(all_clauses);
+            f.clauses.resize(all_clauses, vector<int>());
+            f.clauses_literal_cnt.clear();
+            f.clauses_literal_cnt.resize(all_clauses, 0);
+            f.clause_tf.clear();
+            f.clause_tf.resize(all_clauses, false);
             continue;
         }
 
         while(iss >> literal)
         {
             if(literal == 0) {
-                f.clauses[i++].length = j;
+                f.clauses_literal_cnt[i++] = j;   //子句中文字数量
                 j = 0;
                 continue;
             }
             f.literals_cnt[abs(literal) - 1]++;
-            f.clauses[i].clause.push_back(literal);
+            f.clauses[i].push_back(literal);
             j++;
         }
     }
@@ -128,9 +126,9 @@ void init(F &f)
 
 int FindSignalLiteral(F f, int signal_clause, int index_of_clause)
 {
-    for(size_t i=0; i<f.clauses[index_of_clause].clause.size(); i++)
+    for(size_t i=0; i<f.clauses[index_of_clause].size(); i++)
     {
-        if(abs(f.clauses[index_of_clause].clause[i]) == abs(signal_clause)) return i;
+        if(abs(f.clauses[index_of_clause][i]) == abs(signal_clause)) return i;
     }
     return -1;
 }
@@ -145,20 +143,26 @@ int ChooseLiteral2(F f)
 {
     //返回最短子句中出现次数最多的文字
     //find shorest clause
+    bool flag = false;
     int min = INT16_MAX, index, num;
     for(int i=0; i<f.clauses.size(); i++)
     {
-        if(f.clauses[i].clause_tf == true || f.clauses[i].length == 0) continue;
-        if(f.clauses[i].length < min)
+        if(f.clause_tf[i] == true || f.clauses_literal_cnt[i] == 0) continue;
+        if(f.clauses_literal_cnt[i] > 0 && f.clauses_literal_cnt[i] < min)
         {
-            min = f.clauses[i].length;
+            flag = true;
+            min = f.clauses_literal_cnt[i];
             index = i;
         }
     }
-    int max = INT16_MIN, n = -1;
-    for(int j=0; j<f.clauses[index].clause.size(); j++)
+    if(!flag)   //没找到单子句，证明已经满足
     {
-        n = f.clauses[index].clause[j];
+        return -1;
+    }
+    int max = INT16_MIN, n = -1;
+    for(int j=0; j<f.clauses[index].size(); j++)
+    {
+        n = f.clauses[index][j];
         if(f.literals_pos[abs(n) - 1] == -1 && f.literals_cnt[abs(n) - 1] > max)
         {
             num = n;
@@ -169,16 +173,11 @@ int ChooseLiteral2(F f)
 }
 
 ///单子句传播
-void UP(F &f)
+bool UP(F &f)
 {
     int signal_clause, num1, num2;
-    //检查是否有空子句
-    if(CheckNonClauses(f)) return ;
     //找到单子句并进行单子句传播
-
-    while(auto it = find_if(f.clauses.begin(), f.clauses.end(), [](const struct Clause& c) {
-        return c.length == 1;
-    }))
+    while ((signal_clause = count(f.clauses_literal_cnt.begin(), f.clauses_literal_cnt.end(), 1)) != 0)
     {
         Find_UP(f, signal_clause, num1, num2);    //找到单子句的位置
 
@@ -189,8 +188,11 @@ void UP(F &f)
         f.literals_pos[abs(signal_clause) - 1] = signal_clause < 0 ? 0 : 1;
         f.clauses_literal_cnt[num1] = 0;
 
-        Simplify_clauses(f, signal_clause);    //对单子句进行更新
+        //对单子句进行更新
+        if(!Simplify_clauses(f, signal_clause)) 
+            return false;   //发生冲突
     }
+    return true;
 }
 
 void Find_UP(F f, int &signal_clause, int &num1, int &num2)
@@ -199,7 +201,10 @@ void Find_UP(F f, int &signal_clause, int &num1, int &num2)
     //找到单子句
     for(size_t i=0; i<f.clauses_literal_cnt.size(); i++)
     {
-        if(f.clauses_literal_cnt[i] == 1){ num1 = i; f.clauses_literal_cnt[i] = 0; break; }
+        if(f.clauses_literal_cnt[i] == 1)
+        { 
+            num1 = i; break; 
+        }
     }
     for(size_t i=0; i < f.clauses[num1].size(); i++)
     {
@@ -213,18 +218,18 @@ void Find_UP(F f, int &signal_clause, int &num1, int &num2)
     }
 }
 
-void Simplify_clauses(F &f, int signal_clause)
+bool Simplify_clauses(F &f, int signal_clause)
 {
+    int num;
     //找不为true且包含单子句的子句
     for(size_t i=0; i < f.clause_tf.size(); i++)
     {
         if(!f.clause_tf[i] && f.clauses_literal_cnt[i] > 0)
         {
-            int cnt;
-            //cnt是返回的子句中的literal的下标，找到句子中包含的所有单文字并赋值
             for(size_t j=0; j<f.clauses[i].size(); j++)
             {
-                if(abs(f.clauses[i][j]) == abs(signal_clause))
+                num = abs(f.clauses[i][j]);
+                if(num == abs(signal_clause))
                 {
                     if(f.clauses[i][j] < 0)
                     {
@@ -236,9 +241,13 @@ void Simplify_clauses(F &f, int signal_clause)
                         f.clauses_literal_cnt[i] = signal_clause > 0 ? 0 : f.clauses_literal_cnt[i] - 1;
                     }
                 }
+                if(f.clause_tf[i]) break;   //满足时退出
+                else if(f.clauses_literal_cnt[i] == 0 && f.clause_tf[i] == false)   //出现冲突
+                    return false;
             }
         }
     }
+    return true;
 }
 
 void InsertClauses(F &f, int signal_clause)
@@ -250,6 +259,7 @@ void InsertClauses(F &f, int signal_clause)
     f.clauses.push_back(new_literal);
 
     a.push_back(-1);
+    // f.clauses_sta.push_back(a);
 
     f.clause_tf.push_back(false);
 
@@ -279,48 +289,20 @@ bool CheckSatisfy(F f)
 
 bool DPLL(F &f)
 {
-    UP(f);
-
-    if(CheckSatisfy(f))
-    {
-        flag = true;
-        return true;
-    }
-    if(CheckNonClauses(f)) 
-    {
-        flag = false;
-        return false;
-    }
+    if(!UP(f)) return false;
 
     // int literal = ChooseLiteral(f);
     int literal = ChooseLiteral2(f);
-    
+
+    if(literal == -1) return true;
+
     F f_clone = f;
-
     InsertClauses(f, literal);
-
-    bool test = DPLL(f);
-    if(test)
-    {
-        flag = true;
-        return true;
-    }
-    else
-    {
+    if(DPLL(f)) return true;
+    else{
         f = f_clone;
         InsertClauses(f, -literal);
-
-        test = DPLL(f);
-        if(test)
-        {
-            flag = true;
-            return true;
-        }
-        else
-        {
-            flag = false;
-            return false;
-        }
+        return DPLL(f);
     }
 }
 
@@ -339,7 +321,7 @@ void Print(F f, bool satisfy, int64_t t)
     }
     else printf("s -1\n");
 
-    string s = "res/M/" + file + ".res";
+    string s = "res/M/dpll/" + file + ".res";
     ofstream outfile(s);
 
     if (satisfy)
