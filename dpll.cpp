@@ -31,7 +31,7 @@ class F
     }
 };
 
-string file = "m-mod2c-rand3bip-sat-220-3.shuffled-as.sat05-2490-311";
+string file = "problem11-100";
 bool flag = false;
 int all_literals, all_clauses;
 
@@ -72,7 +72,7 @@ int main()
 
 void init(F &f)
 {
-    string s = "test/M/" + file + ".cnf";
+    string s = "test/S/" + file + ".cnf";
     ifstream file(s);
     if(!file){
         cout<<"Failed to open the file"<<endl;
@@ -380,11 +380,11 @@ void Check(F f)
                 }
             }
         }
-        if(fl)
-        {
-            printf("\nyes\n");
-            return;
-        }
     }
-    printf("\nno\n");
+    if(fl)
+    {
+        printf("\nyes\n");
+        return;
+    }
+    else printf("\nno\n");
 }

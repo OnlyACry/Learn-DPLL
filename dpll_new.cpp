@@ -20,17 +20,25 @@ struct Save_C
 class S_C
 {
     public:   
-    vector<int> v;      //记录改变的文字，其赋值为此文字原本在整个算例中出现的次数
+    bool flip = false;
+    bool flag = false;
+    set<int> change_v;
+    vector<int> v_cnt;      //记录改变的文字，其赋值为此文字原本在整个算例中出现的次数
+    vector<int> v_pos;      //记录改变的文字，其赋值为此文字原本在算例的值
     map<int, struct Save_C> all_change_c;   //记录修改之前的句子
 
     S_C(){}
 
     S_C(const S_C &sc)
     {
-        v = sc.v;
+        v_cnt = sc.v_cnt;
         all_change_c = sc.all_change_c;
+        change_v = sc.change_v;
+        flip = sc.flip;
+        flag = sc.flag;
+        v_pos = sc.v_pos;
     }
-}
+};
 
 //输入算例
 class F
@@ -47,17 +55,24 @@ class F
     F(const F &f)
     {
         literals_pos = f.literals_pos;
-        clauses = f.clauses;
         literals_cnt = f.literals_cnt;
         clauses_literal_cnt = f.clauses_literal_cnt;
         clause_tf = f.clause_tf;
+
+        // 深拷贝 clauses
+        clauses.clear();
+        clauses.reserve(f.clauses.size());
+        for (const auto &clause : f.clauses) {
+            clauses.push_back(clause);  // 这里会调用 vector<int> 的拷贝构造函数来创建新的副本
+        }
     }
 };
 
-string file = "sud00021";
+string file = "problem6-50";
 int all_literals, all_clauses;
 
-void init(F &f);
+void init(F &f, S_C &sc);
+void initsc(S_C &sc);
 bool CheckNonClauses(F f);
 bool CheckSatisfy(F f);
 int ChooseLiteral(F f);
@@ -66,9 +81,10 @@ bool UP(F &f, S_C &sc);
 void Find_UP(F f, int& signal_clause, int &num1, int &num2);
 void Print(F f, bool satisfy, int64_t t);
 void InsertClauses(F &f, int signal_clause);    //插入单子句
-void Simplify_clauses(F &f, int signal_clause, S_C &sc);
+bool Simplify_clauses(F &f, int signal_clause, S_C &sc);
 void BackToPrevious(F &f, S_C sc);
 void Updatef_sc(F &f, S_C &sc, int i, int signal_clause);
+void Check(F f);
 
 int main()
 {
@@ -77,40 +93,65 @@ int main()
     S_C sc;
     stack<S_C>  save_stack;
     stack<int> flip_v;
+    F f, f_clone;
     
-    bool flag = false;
+    bool flag = false, l = false;
     int i = 0, signal_clause;
 
-    init(f);
+    init(f, sc);
+    f_clone = f;
     do{
         if(UP(f, sc))
         {
             signal_clause = ChooseLiteral2(f);
             if(signal_clause == -1) {flag = true; break;}
-
             save_stack.push(sc);
+            initsc(sc);     //清空初始化sc
             flip_v.push(signal_clause);
+            InsertClauses(f, signal_clause);
         }
         else
         {
-            //返回到上一步
-            if(save_stack.empty()) break;
-            
-            sc = save_stack.top();
+            {
+            // //返回到上一步
+            // if(save_stack.empty()) break;
+            // sc = save_stack.top();
+            // save_stack.pop();
+            // if(!sc.all_change_c.empty()) BackToPrevious(f, sc); //sc中map空说明上一个f是最开始的f
+            // else f = f_clone;
+            // //翻转变元
+            // signal_clause = flip_v.top();
+            // InsertClauses(f, -signal_clause);
+            // flip_v.pop();
+            }
+            sc.flag = true;
+            save_stack.push(sc);
+            while (save_stack.top().flip)
+            {
+                BackToPrevious(f, save_stack.top());
+                save_stack.pop();
+                if(save_stack.empty()) break;
+            }
+            BackToPrevious(f, save_stack.top());
             save_stack.pop();
-            BackToPrevious(f, sc);
+            
+            if(flip_v.empty()) break;
             //翻转变元
             signal_clause = flip_v.top();
             InsertClauses(f, -signal_clause);
             flip_v.pop();
+            initsc(sc);     //清空初始化sc
+            // sc.flag = true;
+            sc.flip = true;     //记录下一个UP∪-x已翻转
         }
-    }while(!save_stack.empty())
+    }while(!save_stack.empty());
 
     if(flag)
     {
         auto end_time = std::chrono::high_resolution_clock::now();
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         Print(f, true, duration);
+        Check(f);
     }
     else
     {
@@ -118,14 +159,27 @@ int main()
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
         printf("s -1");
         printf("\nt %ld\n", duration);
+        Check(f);
     }
 
     return 0;
 }
 
-void init(F &f)
+void initsc(S_C &sc)
 {
-    string s = "test/M/" + file + ".cnf";
+    sc.all_change_c.clear();
+    sc.change_v.clear();
+    sc.v_cnt.clear();
+    sc.v_cnt.resize(all_literals, -1);
+    sc.v_pos.clear();
+    sc.v_pos.resize(all_literals, -1);  //插入单子句的变化怎么办
+    sc.flag = false;
+    sc.flip = false;
+}
+
+void init(F &f, S_C &sc)
+{
+    string s = "test/S/" + file + ".cnf";
     ifstream file(s);
     if(!file){
         cout<<"Failed to open the file"<<endl;
@@ -151,6 +205,8 @@ void init(F &f)
             f.clauses_literal_cnt.resize(all_clauses, 0);
             f.clause_tf.clear();
             f.clause_tf.resize(all_clauses, false);
+            sc.v_cnt.resize(all_literals, -1);
+            sc.v_pos.resize(all_literals, -1);
             continue;
         }
 
@@ -169,12 +225,6 @@ void init(F &f)
     }
 }
 
-void initsc(S_C &sc)
-{
-    sc.v.resize(all_literals, -1);
-    sc.all_change_c.resize(all_clauses);
-}
-
 //返回最多次文字出现的下标
 int ChooseLiteral(F f)
 {
@@ -186,20 +236,27 @@ int ChooseLiteral2(F f)
 {
     //返回最短子句中出现次数最多的文字
     //find shorest clause
+    bool flag = false;
     int min = INT16_MAX, index, num;
     for(int i=0; i<f.clauses.size(); i++)
     {
         if(f.clause_tf[i] == true || f.clauses_literal_cnt[i] == 0) continue;
-        if(f.clauses_literal_cnt[i] < min)
+        if(f.clauses_literal_cnt[i] > 0 && f.clauses_literal_cnt[i] < min)
         {
+            flag = true;
             min = f.clauses_literal_cnt[i];
             index = i;
         }
     }
-    int max = INT16_MIN, n = -1;
+    if(!flag)   //没找到单子句，证明已经满足
+    {
+        return -1;
+    }
+    int max = INT16_MIN, n = -1, t;
     for(int j=0; j<f.clauses[index].size(); j++)
     {
         n = f.clauses[index][j];
+        t = f.literals_pos[abs(n) - 1];
         if(f.literals_pos[abs(n) - 1] == -1 && f.literals_cnt[abs(n) - 1] > max)
         {
             num = n;
@@ -211,26 +268,41 @@ int ChooseLiteral2(F f)
 
 void Updatef_sc(F &f, S_C &sc, int i, int signal_clause)
 {
+    int num = abs(signal_clause) - 1;
     struct Save_C pov_clause;
     //首先检测是否已有键值
-    if(sc.all_change_c.find(i) != sc.all_change_c.end()) return;    //存在映射中，不更新
-
-    pov_clause.length = f.clauses_literal_cnt[i];
-    pov_clause.tf = f.clause_tf[i];
-    sc.v[abs(signal_clause) - 1] = f.clauses_literal_cnt[abs(signal_clause) - 1];
-    sc.all_change_c[i] = pov_clause;
+    if(sc.all_change_c.find(i) != sc.all_change_c.end()) {} //存在映射中，不更新
+    else
+    {
+        pov_clause.length = f.clauses_literal_cnt[i];//句子长度
+        pov_clause.tf = f.clause_tf[i];             //句子满足性
+        sc.all_change_c[i] = pov_clause;
+    }
+    if(sc.change_v.find(num) != sc.change_v.end()) {}     //文字之前已经保存过值，不能覆盖
+    else
+    {
+        sc.v_cnt[num] = f.clauses_literal_cnt[num]; //文字总数
+        sc.v_pos[num] = f.literals_pos[num];        //文字改变前
+        sc.change_v.insert(num);
+    }
 }
 
 void BackToPrevious(F &f, S_C sc)
 {
     int index;
     struct Save_C back_c;
-    for (map<int, struct Save_C>::iterator it = myMap.begin(); it != myMap.end(); ++it) 
+    if(sc.all_change_c.empty()) return;
+    for (map<int, struct Save_C>::iterator it = sc.all_change_c.begin(); it != sc.all_change_c.end(); ++it) 
     {
         index = it->first;
         back_c = it->second;
         f.clause_tf[index] = back_c.tf;
         f.clauses_literal_cnt[index] = back_c.length;
+        // f.literals_cnt[index] = sc.v[index];
+    }
+    for (const int& element : sc.change_v) {
+        f.literals_cnt[element] = sc.v_cnt[element];
+        f.literals_pos[element] = sc.v_pos[element];
     }
     f.clauses.pop_back();
     f.clause_tf.pop_back();
@@ -239,7 +311,7 @@ void BackToPrevious(F &f, S_C sc)
 //单子句传播
 bool UP(F &f, S_C &sc)
 {
-    int i
+    int i;
     int signal_clause, num1, num2;
     
     //找到单子句并进行单子句传播
@@ -255,10 +327,10 @@ bool UP(F &f, S_C &sc)
         f.clauses_literal_cnt[num1] = 0;
 
         //对单子句进行更新
-        if(!Simplify_clauses(f, signal_clause)) 
+        if(!Simplify_clauses(f, signal_clause, sc)) 
             return false;   //发生冲突
     }
-    return 0;
+    return true;
 }
 
 void Find_UP(F f, int &signal_clause, int &num1, int &num2)
@@ -281,21 +353,20 @@ void Find_UP(F f, int &signal_clause, int &num1, int &num2)
     }
 }
 
-void Simplify_clauses(F &f, int signal_clause, S_C &sc)
+bool Simplify_clauses(F &f, int signal_clause, S_C &sc)
 {
     //找不为true且包含单子句的子句
     for(size_t i=0; i < f.clause_tf.size(); i++)
     {
         if(!f.clause_tf[i] && f.clauses_literal_cnt[i] > 0)
         {
-            int cnt;
-            int count = count_if(f.clauses[i].begin(), f.clauses[i].end(), [abs(signal_clause)](int x) {
-                return abs(x) == abs(signal_clause);
+            int n = abs(signal_clause);
+            int count = count_if(f.clauses[i].begin(), f.clauses[i].end(), [n](int x) {
+                return abs(x) == n;
             });
             if(count > 0)
             {
-                Updatef_sc(f, sc, num1, signal_clause);   //记录子句之前的值
-                //cnt是返回的子句中的literal的下标，找到句子中包含的所有单文字并赋值
+                Updatef_sc(f, sc, i, signal_clause);   //记录子句之前的值
                 for(size_t j=0; j<f.clauses[i].size(); j++)
                 {
                     if(abs(f.clauses[i][j]) == abs(signal_clause))
@@ -317,6 +388,7 @@ void Simplify_clauses(F &f, int signal_clause, S_C &sc)
             }
         }
     }
+    return true;
 }
 
 bool CheckNonClauses(F f)
@@ -355,7 +427,7 @@ void Print(F f, bool satisfy, int64_t t)
     }
     else printf("s -1\n");
 
-    string s = "res/M/" + file + ".res";
+    string s = "res/S/better/" + file + ".res";
     ofstream outfile(s);
 
     if (satisfy)
@@ -394,4 +466,46 @@ void InsertClauses(F &f, int signal_clause)
     f.clause_tf.push_back(false);
 
     f.clauses_literal_cnt.push_back(1);
+}
+
+void Check(F f)
+{
+    F new_f;
+    int choose;
+    bool fl = false;
+    new_f.clauses = f.clauses;
+    new_f.literals_pos = f.literals_pos;
+
+    for(size_t i=0; i<new_f.clauses.size(); i++)
+    {
+        fl = false;
+        for(size_t j=0; j<new_f.clauses[i].size(); j++)
+        {
+            choose = new_f.literals_pos[abs(new_f.clauses[i][j]) - 1];
+            if(choose == -1)
+            {
+                fl=true;
+                break;
+            }
+            else
+            {
+                if(new_f.clauses[i][j] < 0 && choose == 0)
+                {
+                    fl = true;
+                    break;
+                }
+                if(new_f.clauses[i][j] > 0 && choose == 1)
+                {
+                    fl = true;
+                    break;
+                }
+            }
+        }
+    }
+    if(fl)
+    {
+        printf("\nyes\n");
+        return;
+    }
+    else printf("\nno\n");
 }
