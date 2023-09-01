@@ -31,7 +31,7 @@ class F
     }
 };
 
-string file = "problem11-100";
+string file = "tst_v10_c100";
 bool flag = false;
 int all_literals, all_clauses;
 
@@ -49,30 +49,37 @@ bool DPLL(F &f);
 void Print(F f, bool satisfy, int64_t t);
 void Check(F f);
 
-int main()
+int main() 
 {
-    auto start_time = std::chrono::high_resolution_clock::now();
-    
-    F f;
-    init(f);
-    if(DPLL(f)){
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        Print(f, true, duration);
-    }
-    else{
-        printf("s -1");
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        printf("\nt %ld\n", duration);
-    }
-    Check(f);
+    double cnt = 0;
+    // for (int iteration = 1; iteration <= 5; ++iteration) 
+    // {
+        F f;
+        init(f);
+        auto start_time = std::chrono::high_resolution_clock::now();
+        
+        if(DPLL(f))
+        {
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+            Print(f, true, duration);
+            cnt += duration;
+        }
+        else
+        {
+            printf("s -1");
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
+            printf("\nt %ld\n", duration);
+            cnt += duration;
+        }
+    // }
+    printf("%f", cnt/5000.0);
     return 0;
 }
-
 void init(F &f)
 {
-    string s = "test/S/" + file + ".cnf";
+    string s = "test/tst/" + file + ".cnf";
     ifstream file(s);
     if(!file){
         cout<<"Failed to open the file"<<endl;
@@ -311,17 +318,17 @@ void Print(F f, bool satisfy, int64_t t)
     if(satisfy)
     {
         printf("s 1\nv ");
-        for(size_t i=0; i<f.literals_pos.size(); i++)
-        {
-            if(f.literals_pos[i] == 0) printf("-%ld ", i+1);
-            else if(f.literals_pos[i] == 1) printf("%ld ", i+1);
-            else printf("%ld/-%ld ", i+1, i+1);
-        }
+        // for(size_t i=0; i<f.literals_pos.size(); i++)
+        // {
+        //     if(f.literals_pos[i] == 0) printf("-%ld ", i+1);
+        //     else if(f.literals_pos[i] == 1) printf("%ld ", i+1);
+        //     else printf("%ld/-%ld ", i+1, i+1);
+        // }
         printf("\nt %ld\n", t);
     }
     else printf("s -1\n");
 
-    string s = "res/M/dpll/" + file + ".res";
+    string s = "res/tst/tst/recursion1/" + file + ".res";
     ofstream outfile(s);
 
     if (satisfy)

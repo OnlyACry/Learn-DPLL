@@ -68,7 +68,7 @@ class F
     }
 };
 
-string file = "problem6-50";
+string file = "CBS_k3_n100_m403_b10_999";
 int all_literals, all_clauses;
 
 void init(F &f, S_C &sc);
@@ -88,80 +88,72 @@ void Check(F f);
 
 int main()
 {
-    auto start_time = std::chrono::high_resolution_clock::now();
-
     S_C sc;
     stack<S_C>  save_stack;
     stack<int> flip_v;
     F f, f_clone;
-    
+    double cnt = 0;
     bool flag = false, l = false;
     int i = 0, signal_clause;
+    for (int iteration = 1; iteration <= 5; ++iteration) 
+    {
+        init(f, sc);
+        auto start_time = std::chrono::high_resolution_clock::now();
+        do{
+            if(UP(f, sc))
+            {
+                signal_clause = ChooseLiteral2(f);
+                if(signal_clause == -1) {flag = true; break;}
+                save_stack.push(sc);
+                initsc(sc);     //清空初始化sc
+                flip_v.push(signal_clause);
+                InsertClauses(f, signal_clause);
+            }
+            else
+            {
+                sc.flag = true;
+                save_stack.push(sc);
+                while (save_stack.top().flip)
+                {
+                    BackToPrevious(f, save_stack.top());
+                    save_stack.pop();
+                    if(save_stack.empty()) break;
+                }
+                if(save_stack.top().all_change_c.size() == 0) break;    //找不到满足解
+                BackToPrevious(f, save_stack.top());
+                save_stack.pop();
+                
+                if(flip_v.empty()) break;
+                //翻转变元
+                signal_clause = flip_v.top();
+                InsertClauses(f, -signal_clause);
+                flip_v.pop();
+                initsc(sc);     //清空初始化sc
+                // sc.flag = true;
+                sc.flip = true;     //记录下一个UP∪-x已翻转
+            }
+        }while(!save_stack.empty());
 
-    init(f, sc);
-    f_clone = f;
-    do{
-        if(UP(f, sc))
+        if(flag)
         {
-            signal_clause = ChooseLiteral2(f);
-            if(signal_clause == -1) {flag = true; break;}
-            save_stack.push(sc);
-            initsc(sc);     //清空初始化sc
-            flip_v.push(signal_clause);
-            InsertClauses(f, signal_clause);
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+            
+            Print(f, true, duration);
+            cnt += duration;
+            // Check(f);
         }
         else
         {
-            {
-            // //返回到上一步
-            // if(save_stack.empty()) break;
-            // sc = save_stack.top();
-            // save_stack.pop();
-            // if(!sc.all_change_c.empty()) BackToPrevious(f, sc); //sc中map空说明上一个f是最开始的f
-            // else f = f_clone;
-            // //翻转变元
-            // signal_clause = flip_v.top();
-            // InsertClauses(f, -signal_clause);
-            // flip_v.pop();
-            }
-            sc.flag = true;
-            save_stack.push(sc);
-            while (save_stack.top().flip)
-            {
-                BackToPrevious(f, save_stack.top());
-                save_stack.pop();
-                if(save_stack.empty()) break;
-            }
-            BackToPrevious(f, save_stack.top());
-            save_stack.pop();
-            
-            if(flip_v.empty()) break;
-            //翻转变元
-            signal_clause = flip_v.top();
-            InsertClauses(f, -signal_clause);
-            flip_v.pop();
-            initsc(sc);     //清空初始化sc
-            // sc.flag = true;
-            sc.flip = true;     //记录下一个UP∪-x已翻转
+            auto end_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time).count();
+            printf("s -1");
+            printf("\nt %ld\n", duration);
+            cnt += duration;
+            // Check(f);
         }
-    }while(!save_stack.empty());
-
-    if(flag)
-    {
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        Print(f, true, duration);
-        Check(f);
     }
-    else
-    {
-        auto end_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-        printf("s -1");
-        printf("\nt %ld\n", duration);
-        Check(f);
-    }
-
+    printf("%f", cnt/5000000.0);
     return 0;
 }
 
@@ -179,7 +171,7 @@ void initsc(S_C &sc)
 
 void init(F &f, S_C &sc)
 {
-    string s = "test/S/" + file + ".cnf";
+    string s = "test/tst/" + file + ".cnf";
     ifstream file(s);
     if(!file){
         cout<<"Failed to open the file"<<endl;
@@ -417,17 +409,17 @@ void Print(F f, bool satisfy, int64_t t)
     if(satisfy)
     {
         printf("s 1\nv ");
-        for(size_t i=0; i<f.literals_pos.size(); i++)
-        {
-            if(f.literals_pos[i] == 0) printf("-%ld ", i+1);
-            else if(f.literals_pos[i] == 1) printf("%ld ", i+1);
-            else printf("%ld/-%ld ", i+1, i+1);
-        }
+        // for(size_t i=0; i<f.literals_pos.size(); i++)
+        // {
+        //     if(f.literals_pos[i] == 0) printf("-%ld ", i+1);
+        //     else if(f.literals_pos[i] == 1) printf("%ld ", i+1);
+        //     else printf("%ld/-%ld ", i+1, i+1);
+        // }
         printf("\nt %ld\n", t);
     }
     else printf("s -1\n");
 
-    string s = "res/S/better/" + file + ".res";
+    string s = "res/tst/tst/better/" + file + ".res";
     ofstream outfile(s);
 
     if (satisfy)
