@@ -40,48 +40,22 @@ class S_C
     }
 };
 
-struct v_times
-{
-    int abs_v;  //文字
-    int times;  //文字出现的次数
-}v_times;
-
-class Classify_Moms
-{
-    public:
-    int clause_length;  //子句长度
-    vector<v_times> statistics_clause_v;    //长度为clause_length的v中出现的变元以及它们各自出现的频率
-
-    Classify_Moms(){}
-
-    Classify_Moms(const Classify_Moms &moms)
-    {
-        clause_length = moms.clause_length;
-        statistics_clause_v.clear();
-        statistics_clause_v.reserve(moms.statistics_clause_v.size());
-        for (const auto &x : moms.statistics_clause_v) {
-            statistics_clause_v.push_back(x);  // 这里会调用 vector<int> 的拷贝构造函数来创建新的副本
-        }
-    }
-
-}
-
 //输入算例
 class F
 {
     public:
     vector<int> literals_pos;   //文字 0-false 1-true -1-unsigned
-    // vector<int> literals_cnt;   //文字出现次数
+    vector<int> literals_cnt;   //文字出现次数
     vector<int> clauses_literal_cnt;    //子句长度
     vector<bool> clause_tf;     //子句是否满足
     vector<vector<int>> clauses;    //子句
-    
+
     F(){}
 
     F(const F &f)
     {
         literals_pos = f.literals_pos;
-        // literals_cnt = f.literals_cnt;
+        literals_cnt = f.literals_cnt;
         clauses_literal_cnt = f.clauses_literal_cnt;
         clause_tf = f.clause_tf;
 
@@ -94,7 +68,7 @@ class F
     }
 };
 
-string file = "3blocks";
+string file = "2bitmax_6";
 int all_literals, all_clauses;
 
 void init(F &f, S_C &sc);
@@ -215,8 +189,8 @@ void init(F &f, S_C &sc)
             iss >> p >> cnf >> all_literals >> all_clauses;
             f.literals_pos.clear();
             f.literals_pos.resize(all_literals, -1);
-            // f.literals_cnt.clear();
-            // f.literals_cnt.resize(all_literals);
+            f.literals_cnt.clear();
+            f.literals_cnt.resize(all_literals);
             f.clauses.clear();
             f.clauses.resize(all_clauses);
             f.clauses_literal_cnt.clear();
@@ -235,8 +209,8 @@ void init(F &f, S_C &sc)
                 j = 0;
                 continue;
             }
-            // if(literal > 0) f.literals_cnt[literal-1]++;
-            // else if(literal < 0) f.literals_cnt[abs(literal) - 1]++;
+            if(literal > 0) f.literals_cnt[literal-1]++;
+            else if(literal < 0) f.literals_cnt[abs(literal) - 1]++;
             f.clauses[i].push_back(literal);
             j++;
         }
@@ -246,7 +220,7 @@ void init(F &f, S_C &sc)
 //返回最多次文字出现的下标
 int ChooseLiteral(F f)
 {
-    // return max_element(f.literals_cnt.begin(), f.literals_cnt.end()) - f.literals_cnt.begin() + 1;
+    return max_element(f.literals_cnt.begin(), f.literals_cnt.end()) - f.literals_cnt.begin() + 1;
 }
 
 //返回句子最短的未赋值文字
@@ -275,11 +249,11 @@ int ChooseLiteral2(F f)
     {
         n = f.clauses[index][j];
         t = f.literals_pos[abs(n) - 1];
-        // if(f.literals_pos[abs(n) - 1] == -1 && f.literals_cnt[abs(n) - 1] > max)
-        // {
-        //     num = n;
-        //     // max = f.literals_cnt[abs(n) - 1];
-        // }
+        if(f.literals_pos[abs(n) - 1] == -1 && f.literals_cnt[abs(n) - 1] > max)
+        {
+            num = n;
+            max = f.literals_cnt[abs(n) - 1];
+        }
     }
     return num;
 }
@@ -319,7 +293,7 @@ void BackToPrevious(F &f, S_C sc)
         // f.literals_cnt[index] = sc.v[index];
     }
     for (const int& element : sc.change_v) {
-        // f.literals_cnt[element] = sc.v_cnt[element];
+        f.literals_cnt[element] = sc.v_cnt[element];
         f.literals_pos[element] = sc.v_pos[element];
     }
     f.clauses.pop_back();
@@ -340,7 +314,7 @@ bool UP(F &f, S_C &sc)
         //单子句赋值为真、此文字的计数更新为零
         //进行传播
         f.clause_tf[num1] = true;
-        // f.literals_cnt[abs(signal_clause) - 1] = 0;
+        f.literals_cnt[abs(signal_clause) - 1] = 0;
         f.literals_pos[abs(signal_clause) - 1] = signal_clause < 0 ? 0 : 1;
         f.clauses_literal_cnt[num1] = 0;
 

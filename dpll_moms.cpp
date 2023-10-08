@@ -69,7 +69,7 @@ class F
     }
 };
 
-string file = "2bitcomp_5";
+string file = "4blocks";
 int all_literals, all_clauses;
 
 void init(F &f, S_C &sc);
@@ -87,8 +87,7 @@ bool Simplify_clauses(F &f, int signal_clause, S_C &sc);
 void BackToPrevious(F &f, S_C sc);
 void Updatef_sc(F &f, S_C &sc, int i, int signal_clause);
 void Check(F f);
-unsigned int generateSeedFromTimestamp();
-int create_random_num(int max_num);
+unsigned int generateSeed(int max_num);
 
 int main()
 {
@@ -140,7 +139,7 @@ int main()
             }
             auto end_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
-            if(duration > 1000000) break;
+            if(duration > 100000) break;
         }while(!save_stack.empty());
 
         if(flag)
@@ -149,11 +148,7 @@ int main()
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
             
             Print(f, true, duration);
-            if(duration < 1000000) 
-            {
-                cnt1 += duration;
-                cnt2++;
-            }
+            cnt1 += duration;
             // Check(f);
         }
         else
@@ -162,11 +157,7 @@ int main()
             auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end_time - start_time).count();
             printf("s -1");
             printf("\nt %ld\n", duration);
-            if(duration < 1000000) 
-            {
-                cnt1 += duration;
-                cnt2++;
-            }
+            cnt1 += duration;
             // Check(f);
         }
     }
@@ -292,7 +283,7 @@ int ChooseLiteral3(F f)
     if(!flag) return -1;
     int mx = INT16_MIN, num;
     vector<int> vt, can;
-    vt.resize(all_literals, 0);
+    vt.resize(all_literals + 1, 0);     //
     //找到频率最高的那些文字
     for(int i=0; i<all_clauses; i++)
     {
@@ -301,7 +292,7 @@ int ChooseLiteral3(F f)
             for(int j=0; j<f.clauses[i].size(); j++)
             {
                 num = abs(f.clauses[i][j]);
-                if(f.literals_pos[num] == -1)
+                if(f.literals_pos[num - 1] == -1)
                 {
                     vt[num]++;
                     if(mx < vt[num])
@@ -315,23 +306,19 @@ int ChooseLiteral3(F f)
             }
         }
     }
-    return can[create_random_num(can.size() - 1)];
+    return can[generateSeed(can.size())];
+    // return can[0];
 }
 
-unsigned int generateSeedFromTimestamp() {
-  auto now = std::chrono::system_clock::now(); // 获取当前时间点
-  auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()); // 转换为毫秒级的时间戳
- 
-  return static_cast<unsigned int>(timestamp.count()); // 将时间戳转换为整数种子值
-}
-
-int create_random_num(int max_num)
+unsigned int generateSeed(int max_num) 
 {
-    unsigned int seed = generateSeedFromTimestamp(); // 生成种子值
-    mt19937 engine(seed);   // 使用种子值初始化伪随机数生成器
-    int num = max_num;      // 设置随机数的上限
-    uniform_int_distribution<int> dist(0, num); // 创建一个均匀整数分布对象
-    return dist(engine);
+    random_device rd; // 用于生成种子
+    mt19937 gen(rd()); // Mersenne Twister 引擎，通常是个很好的选择
+
+    // 创建分布器并生成随机数
+    uniform_int_distribution<int> dis(0, max_num - 1); // 生成1到max_num - 1之间的整数
+
+    return dis(gen);
 }
 
 void Updatef_sc(F &f, S_C &sc, int i, int signal_clause)
