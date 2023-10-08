@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <set>
 #include <map>
+#include <random>
 
 using namespace std;
 
@@ -86,6 +87,8 @@ bool Simplify_clauses(F &f, int signal_clause, S_C &sc);
 void BackToPrevious(F &f, S_C sc);
 void Updatef_sc(F &f, S_C &sc, int i, int signal_clause);
 void Check(F f);
+unsigned int generateSeedFromTimestamp();
+int create_random_num(int max_num);
 
 int main()
 {
@@ -311,9 +314,24 @@ int ChooseLiteral3(F f)
                 }
             }
         }
-        
     }
-    return can[rand() % can.size()];
+    return can[create_random_num(can.size() - 1)];
+}
+
+unsigned int generateSeedFromTimestamp() {
+  auto now = std::chrono::system_clock::now(); // 获取当前时间点
+  auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()); // 转换为毫秒级的时间戳
+ 
+  return static_cast<unsigned int>(timestamp.count()); // 将时间戳转换为整数种子值
+}
+
+int create_random_num(int max_num)
+{
+    unsigned int seed = generateSeedFromTimestamp(); // 生成种子值
+    mt19937 engine(seed);   // 使用种子值初始化伪随机数生成器
+    int num = max_num;      // 设置随机数的上限
+    uniform_int_distribution<int> dist(0, num); // 创建一个均匀整数分布对象
+    return dist(engine);
 }
 
 void Updatef_sc(F &f, S_C &sc, int i, int signal_clause)
